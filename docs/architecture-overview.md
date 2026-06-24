@@ -5,8 +5,8 @@
 This program demonstrates how to take an AI-enabled application from threat model to
 running, defended code. It picks up a system that was deliberately left as a design-only
 artifact in a companion repository and builds it for real: a RAG-based customer service
-assistant, hosted on AKS, with input/output guardrails, a security-gated CI/CD pipeline,
-and a detection rule built against its own logs.
+assistant, hosted on AKS, with input/output guardrails, a security-gated CI/CD pipeline
+covering both static and dynamic testing, and a detection rule built against its own logs.
 
 Where the companion governance program answers *"what controls should exist around this
 AI system?"*, this program answers *"how do you actually build and ship the thing those
@@ -62,13 +62,25 @@ policies, least-privilege RBAC, restricted Pod Security Standards, and secrets s
 from Azure Key Vault via Workload Identity — not environment variables or in-cluster
 secrets.
 
-### 5. CI/CD security gates — GitHub Actions
+### 5. Static CI/CD security gates (pre-deploy) — GitHub Actions
 Every commit passes through CodeQL (SAST), Gitleaks (secret scanning), Trivy (container
 image scanning), and Checkov (Terraform/IaC scanning) before a build is eligible for
-deployment. Findings are evidence, not just green checkmarks — see each workflow's
-deployment notes for what was actually caught and fixed during the build.
+deployment. These gates operate on source code, dependencies, the built container image,
+and Terraform configuration — none of them require a running instance of the application.
+Findings are evidence, not just green checkmarks — see each workflow's deployment notes
+for what was actually caught and fixed during the build.
 
-### 6. Detection — Microsoft Sentinel
+### 6. Dynamic security gate (post-deploy) — OWASP ZAP
+Static analysis cannot catch issues that only exist when the application is actually
+running — authentication bypass on a live endpoint, misconfigured headers, or
+injection points reachable only through the real HTTP request/response cycle. After a
+build passes the static gates and deploys to a staging AKS endpoint, `zap-scan.yml` runs
+an OWASP ZAP baseline (and, where the build budget allows, full active) scan against that
+live endpoint, mapped to the OWASP Top 10 for web applications. A failing scan blocks
+promotion to production the same way a failing static gate blocks the build — this is a
+deployment gate, not a report that gets read later.
+
+### 7. Detection — Microsoft Sentinel
 One KQL analytics rule for prompt injection attempt detection, built against real
 application logs emitted by the guardrails above — not a generic template. This is the
 same detection category that the governance repo's `sentinel/README.md` documents as
@@ -101,6 +113,19 @@ flowchart TD
         RBAC[Namespace RBAC]
     end
 
+    subgraph CICD["CI/CD Pipeline"]
+        STATIC[Static Gates\nCodeQL / Gitleaks / Trivy / Checkov]
+        STAGE[Deploy to Staging]
+        ZAP[OWASP ZAP\nDynamic Scan]
+        PROD[Promote to Production]
+    end
+
+    STATIC -->|pass| STAGE
+    STAGE --> ZAP
+    ZAP -->|pass| PROD
+    ZAP -.->|fail = block promotion| STAGE
+    PROD --> AKS
+
     AKS -.->|reads secrets| KV
     AKS -.->|enforced by| NETPOL
     AKS -.->|enforced by| RBAC
@@ -112,10 +137,12 @@ flowchart TD
     classDef guard fill:#c43e1c,stroke:#a33519,color:#fff
     classDef sec fill:#8764b8,stroke:#6b4f9e,color:#fff
     classDef detect fill:#107c10,stroke:#0a5c0a,color:#fff
+    classDef pipeline fill:#ca5010,stroke:#a8420c,color:#fff
     class API app
     class INFILTER,OUTFILTER,REJECT guard
     class KV,NETPOL,RBAC sec
     class SENTINEL,LOGS detect
+    class STATIC,STAGE,ZAP,PROD pipeline
 ```
 
 ## Data flow and trust boundaries
@@ -127,11 +154,15 @@ flowchart TD
 | RAG API → Azure OpenAI | Model invocation | Workload Identity, no embedded API keys |
 | Azure OpenAI → Output guardrail | Generated response before customer delivery | `response_filter.py` — second trust boundary, untrusted model output |
 | AKS → Azure Key Vault | Secret retrieval | Workload Identity Federation, no static credentials in cluster |
+| CI pipeline → Staging endpoint | Automated deploy before promotion | Static gates must pass first; staging is isolated from production secrets/data |
+| External scanner → Staging endpoint | OWASP ZAP dynamic scan | Treats the running application as untrusted/attacker-reachable, same as a real external probe |
 | Application → Sentinel | Log ingestion | Diagnostic settings / Log Analytics workspace |
 
-The two guardrails are the program's primary trust boundaries: user input is treated as
-untrusted on the way in, and model output is treated as untrusted on the way out — the
-model itself is not a trusted intermediary in either direction.
+The two guardrails are the program's primary *runtime* trust boundaries: user input is
+treated as untrusted on the way in, and model output is treated as untrusted on the way
+out. The staging-endpoint boundary crossed by OWASP ZAP is a *pipeline* trust boundary —
+it tests whether the deployed system, taken as a whole, behaves like an untrusted target
+would expect it to resist attack, independent of what the static gates already approved.
 
 ## Design principles
 
@@ -139,6 +170,10 @@ model itself is not a trusted intermediary in either direction.
   to mitigate a threat-model risk has a corresponding test case showing it firing.
 - **Defence is layered, not single-point.** Network policy, RBAC, Workload Identity, and
   application-level guardrails all assume the others can fail.
+- **Static and dynamic testing are complementary, not redundant.** Static gates catch
+  issues in code and config before anything runs; OWASP ZAP catches issues that only
+  manifest in a running, networked instance. Passing static gates is necessary but not
+  sufficient for promotion to production.
 - **Evidence over architecture diagrams.** Every component this program claims is "live"
   is backed by a deployment note describing what was actually configured, what broke, and
   how it was fixed — following the same evidence standard as the other two repos in this
@@ -153,7 +188,7 @@ model itself is not a trusted intermediary in either direction.
 | RAG API application security | AI use-case risk tiering and governance (→ governance repo) |
 | Prompt injection / output validation guardrails | Tenant-wide Copilot identity controls (→ ERP / governance repos) |
 | AKS workload security (RBAC, NetworkPolicy, Pod Security, Workload Identity) | Broader Entra Conditional Access design (→ governance repo) |
-| CI/CD security gates (SAST, secrets, container, IaC scanning) | Multi-service event-driven architecture, Kafka, API Gateway |
+| CI/CD security gates — static (SAST, secrets, container, IaC) and dynamic (DAST) | Multi-service event-driven architecture, Kafka, API Gateway |
 | One detection rule built against real application logs | Full SOC detection coverage across multiple AI systems |
 
 This program is intentionally a single, deep slice — one AI service, secured end to end
@@ -167,6 +202,7 @@ deliberately cut down to keep evidence quality high and the build finishable.
 - **AI platform**: Azure OpenAI Service, Azure AI Search (retrieval)
 - **Hosting**: Azure Kubernetes Service (AKS)
 - **Secrets**: Azure Key Vault, Workload Identity Federation
-- **CI/CD**: GitHub Actions (CodeQL, Gitleaks, Trivy, Checkov)
+- **CI/CD — static**: GitHub Actions (CodeQL, Gitleaks, Trivy, Checkov)
+- **CI/CD — dynamic**: OWASP ZAP, run against a staging AKS endpoint post-deploy
 - **IaC**: Terraform
 - **Detection**: Microsoft Sentinel, KQL
