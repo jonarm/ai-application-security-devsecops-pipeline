@@ -1,0 +1,47 @@
+name: Checkov (IaC Scan)
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "terraform/**"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "terraform/**"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  checkov:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          soft_fail: false
+          # soft_fail: false means a real finding fails the build. Two
+          # findings this configuration is expected to surface
+          # (CKV_AZURE_110, CKV_AZURE_6) are addressed with inline
+          # #checkov:skip annotations carrying a written justification in
+          # the Terraform files themselves, rather than left to fail the
+          # pipeline silently or swept under soft_fail — see
+          # terraform/key-vault.tf, terraform/aks.tf, and
+          # .github/workflows/README.md for the reasoning behind each.
+
+      - name: Upload Checkov results to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov-results.sarif

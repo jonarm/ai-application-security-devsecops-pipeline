@@ -1,0 +1,10 @@
+title = "gitleaks config - AI AppSec & DevSecOps Pipeline"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positive - app/tests/test_response_filter.py intentionally contains fake, key-shaped secret strings used as fixtures to test response_filter.py's own sensitive-data detection. These are not real credentials."
+paths = [
+  '''app/tests/test_response_filter\.py''',
+]

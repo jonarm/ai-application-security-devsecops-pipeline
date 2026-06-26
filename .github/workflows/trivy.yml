@@ -1,0 +1,46 @@
+name: Trivy (Container Image Scan)
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "app/**"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "app/**"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build rag-api image
+        run: docker build -t rag-api:scan ./app/rag-api
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: rag-api:scan
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          # exit-code 1 is what actually makes this a gate, not a report —
+          # a failed scan fails the workflow and blocks merge/deploy,
+          # consistent with the "findings are evidence, not just green
+          # checkmarks" principle in docs/architecture-overview.md.
+
+      - name: Upload Trivy results to Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif

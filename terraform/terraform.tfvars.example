@@ -1,0 +1,15 @@
+resource_group_name = "rg-ai-appsec-devsecops"
+location             = "australiaeast"
+environment          = "dev"
+
+aks_cluster_name = "aks-contoso-rag"
+aks_node_count   = 2
+aks_node_vm_size = "Standard_B2s"
+
+# Must be globally unique across all of Azure — change before applying.
+acr_name       = "acrcontosoragXXXX"
+key_vault_name = "kv-contoso-ragXXXX"
+
+workload_identity_name  = "id-rag-api-workload"
+rag_api_namespace       = "contoso-rag"
+rag_api_service_account = "rag-api-sa"

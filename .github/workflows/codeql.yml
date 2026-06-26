@@ -1,0 +1,40 @@
+name: CodeQL (SAST)
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "app/**"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "app/**"
+  schedule:
+    # Weekly scheduled scan catches newly-disclosed CodeQL query patterns
+    # against code that hasn't changed since the last push — a push-only
+    # trigger would miss these entirely.
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"

@@ -1,0 +1,49 @@
+name: OWASP ZAP (DAST)
+
+# This workflow scans a RUNNING instance of the RAG API — it cannot run
+# against source code, only against a deployed staging endpoint. It is
+# triggered manually (workflow_dispatch) rather than automatically chained
+# after a deploy step, because this repo does not yet include a CI-driven
+# deployment workflow that provisions a staging endpoint — see
+# .github/workflows/README.md for current status. Wiring this to run
+# automatically post-deploy is a documented next step, not yet built.
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Staging endpoint to scan, e.g. https://staging.rag-api.example.com"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  zap-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          target: ${{ inputs.target_url }}
+          rules_file_name: ".zap/rules.tsv"
+          cmd_options: "-a"
+          # fail_action: true is what makes this a real deployment gate,
+          # not just an informational report — matches the "ZAP fail =
+          # block promotion" path in the architecture-overview.md
+          # pipeline diagram.
+          fail_action: true
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-baseline-report
+          path: report_html.html
