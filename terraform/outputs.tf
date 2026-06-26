@@ -22,3 +22,18 @@ output "rag_api_workload_identity_client_id" {
 output "resource_group_name" {
   value = azurerm_resource_group.main.name
 }
+
+output "github_actions_client_id" {
+  description = "Paste into the AZURE_CLIENT_ID GitHub Actions secret."
+  value       = azurerm_user_assigned_identity.github_actions_ci.client_id
+}
+
+output "github_actions_tenant_id" {
+  description = "Paste into the AZURE_TENANT_ID GitHub Actions secret."
+  value       = data.azurerm_client_config.current.tenant_id
+}
+
+output "github_actions_subscription_id" {
+  description = "Paste into the AZURE_SUBSCRIPTION_ID GitHub Actions secret."
+  value       = data.azurerm_client_config.current.subscription_id
+}

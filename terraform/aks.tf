@@ -23,6 +23,19 @@ resource "azurerm_kubernetes_cluster" "main" {
     name       = "default"
     node_count = var.aks_node_count
     vm_size    = var.aks_node_vm_size
+
+    # Azure sets these defaults automatically on node pool creation, even
+    # though they were never declared here. Without explicitly matching
+    # them, every subsequent `terraform plan` shows drift and attempts to
+    # null them out on `apply` — which is harmless when the cluster is
+    # running, but fails outright when it's stopped, since AKS disallows
+    # any node pool modification on a stopped cluster. Declaring the exact
+    # values Azure already set eliminates the diff entirely.
+    upgrade_settings {
+      max_surge                     = "10%"
+      drain_timeout_in_minutes      = 0
+      node_soak_duration_in_minutes = 0
+    }
   }
 
   identity {

@@ -72,3 +72,10 @@ variable "tags" {
     managed_by = "terraform"
   }
 }
+
+variable "github_repository" {
+  description = "GitHub repository in OWNER/REPO format, used to scope the OIDC federated credential subject for CI/CD. Must exactly match the real repo — this is a case-sensitive, exact-string trust boundary, not a cosmetic label."
+  type        = string
+  # Deliberately no default — this must be set explicitly in
+  # terraform.tfvars to the real repository path.
+}
