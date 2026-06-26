@@ -20,17 +20,14 @@ kubectl apply -f kubernetes\deployment.yaml
 | Applied to a live AKS cluster | **Reference design** — AKS has not yet been provisioned (see `terraform/`); these manifests have not yet been run against a real API server |
 | Workload Identity client-id / image registry / Azure endpoint placeholders | **Not yet populated** — `<MANAGED_IDENTITY_CLIENT_ID>`, `<ACR_NAME>`, and the four `<SET_VIA_TERRAFORM_OUTPUT>` values in `deployment.yaml` are filled in from Terraform outputs once `terraform/` is applied |
 
-## Issues caught before first deploy
+## Issues encountered on the first real deploy
 
-- **`readOnlyRootFilesystem: true` + MSAL token cache write.** `azure-identity`
-  (used in `app/rag-api/clients.py`) attempts to write a token cache to the
-  home directory on first credential use. Under a read-only root
-  filesystem, this would crash the pod on the first real (non-mock) Azure
-  OpenAI call. Fixed by mounting an `emptyDir` at `/tmp` and setting
-  `HOME=/tmp` — see the inline comments in `deployment.yaml`.
-- **PodSecurityPolicy vs. Pod Security Standards.** PSP was removed in
-  Kubernetes 1.25. `pod-security.yaml` uses namespace-label-based Pod
-  Security Standards instead, which is the current supported mechanism.
+- **`readOnlyRootFilesystem` + MSAL token cache** — caught before deploy
+  via code review, not a real crash. See `deployment.yaml` comments.
+- **CrashLoopBackOff from a Docker build context bug** — a real crash on
+  first deploy, not anticipated in advance. Root cause was in the image
+  build, not in any Kubernetes manifest in this folder. Full writeup in
+  `app/README.md`.
 
 ## Known limitations
 

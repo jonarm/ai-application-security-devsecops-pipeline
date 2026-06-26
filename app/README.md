@@ -94,3 +94,22 @@ docker push "<acr-login-server>/rag-api:latest"
 This is a real example of free-tier Azure subscription constraints shaping
 a technical decision — documented rather than hidden, consistent with this
 repo series' standard.
+
+## Issues encountered and resolved — AKS deployment
+
+- **CrashLoopBackOff on first real AKS deploy — wrong Docker build context.**
+  The Dockerfile was originally built and pushed with context scoped to
+  `app/rag-api/` only (`docker build . ` run from inside that directory).
+  `main.py` imports `prompt_filter` and `response_filter` from one
+  directory up by design (see the import comment in `main.py`), but those
+  files were never included in that build context — they simply weren't
+  in the image. The container crashed with `ModuleNotFoundError` at
+  startup, before binding a port, which produced an instant
+  `CrashLoopBackOff` with `Exit Code 1` well before the liveness probe's
+  5-second delay ever ran. Confirmed via `kubectl logs` before fixing.
+  Fixed by changing the build context to `app/` and pointing `-f` at
+  `rag-api/Dockerfile`, with the Dockerfile updated to `COPY` the
+  guardrail files explicitly before the service code. Workload Identity,
+  image pull, and pod scheduling all worked correctly on the very first
+  attempt — only the application's own module layout inside the image was
+  wrong.
