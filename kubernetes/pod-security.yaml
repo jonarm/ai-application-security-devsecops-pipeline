@@ -1,0 +1,31 @@
+# pod-security.yaml — Namespace definition with Pod Security Standards enforcement.
+#
+# Note: PodSecurityPolicy (PSP) was deprecated in Kubernetes 1.21 and removed
+# entirely in 1.25. Pod Security Standards (PSS), enforced via namespace
+# labels, is the current built-in mechanism (stable since 1.25) and is what
+# this file uses — no third-party admission controller (e.g. Kyverno, OPA
+# Gatekeeper) is required for this baseline.
+#
+# "restricted" is the most stringent of the three built-in PSS profiles
+# (privileged / baseline / restricted). It requires, among other things:
+#   - containers must not run as root
+#   - no privilege escalation
+#   - a defined seccomp profile
+#   - no hostPath volumes, host networking, or host PID/IPC namespaces
+# The rag-api Dockerfile (app/rag-api/Dockerfile) already runs as a non-root
+# user for this reason — restricted mode would reject the pod otherwise.
+#
+# Apply this file FIRST — rbac.yaml, network-policy.yaml, and
+# deployment.yaml all reference this namespace and assume it already
+# exists; they do not redefine it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contoso-rag
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest

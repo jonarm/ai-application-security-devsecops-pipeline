@@ -1,0 +1,55 @@
+# rbac.yaml — ServiceAccount, Role, and RoleBinding for the RAG API workload.
+#
+# Two distinct identity systems are at play here, and it's worth being
+# explicit about which does what:
+#   - Kubernetes RBAC (this file) governs what the pod can do TO THE
+#     CLUSTER via the Kubernetes API (e.g. read its own ConfigMap).
+#   - Azure Workload Identity Federation (the annotation on the
+#     ServiceAccount below) governs what the pod can do TO AZURE
+#     RESOURCES (Key Vault, Azure OpenAI, Azure AI Search) — that access
+#     is controlled by Azure RBAC role assignments on the federated
+#     identity, configured in terraform/, not by anything in this file.
+#
+# This ServiceAccount intentionally has the NARROWEST possible Kubernetes
+# RBAC grant — read-only access to its own namespace's ConfigMaps — because
+# the RAG API does not need to talk to the Kubernetes API for anything else.
+# Secrets are deliberately NOT included in this Role: the application reads
+# secrets from Azure Key Vault via Workload Identity, never from Kubernetes
+# Secret objects, so no RBAC grant for k8s Secrets exists at all.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rag-api-sa
+  namespace: contoso-rag
+  annotations:
+    # Populated by Terraform once the federated identity credential is
+    # created — see terraform/README.md for the exact apply step. Left as
+    # a placeholder here since this value doesn't exist until that
+    # resource is provisioned.
+    azure.workload.identity/client-id: "<MANAGED_IDENTITY_CLIENT_ID>"
+  labels:
+    azure.workload.identity/use: "true"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rag-api-role
+  namespace: contoso-rag
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rag-api-rolebinding
+  namespace: contoso-rag
+subjects:
+  - kind: ServiceAccount
+    name: rag-api-sa
+    namespace: contoso-rag
+roleRef:
+  kind: Role
+  name: rag-api-role
+  apiGroup: rbac.authorization.k8s.io

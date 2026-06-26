@@ -1,0 +1,118 @@
+# deployment.yaml — Deployment and Service for the RAG API.
+#
+# securityContext settings here are what actually satisfy the "restricted"
+# Pod Security Standard enforced by the namespace label in
+# pod-security.yaml — the namespace label only enforces the requirement,
+# this file is what meets it. If any of these fields are removed, the pod
+# will be rejected by the API server at apply time, not silently allowed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-api
+  namespace: contoso-rag
+  labels:
+    app: rag-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rag-api
+  template:
+    metadata:
+      labels:
+        app: rag-api
+        # Required for AKS's Workload Identity webhook to inject the
+        # federated token volume into this pod.
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: rag-api-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: rag-api
+          image: <ACR_NAME>.azurecr.io/rag-api:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: RAG_MOCK_MODE
+              # Set to "false" once terraform/ has provisioned real Azure
+              # OpenAI and Azure AI Search resources — see app/README.md
+              # "What's actually live vs. reference design" for current
+              # status. Left as "true" here so an early deploy of this
+              # manifest is safe and self-contained even before those
+              # resources exist.
+              value: "true"
+            - name: AZURE_OPENAI_ENDPOINT
+              value: "<SET_VIA_TERRAFORM_OUTPUT>"
+            - name: AZURE_OPENAI_DEPLOYMENT
+              value: "<SET_VIA_TERRAFORM_OUTPUT>"
+            - name: AZURE_SEARCH_ENDPOINT
+              value: "<SET_VIA_TERRAFORM_OUTPUT>"
+            - name: AZURE_SEARCH_INDEX
+              value: "<SET_VIA_TERRAFORM_OUTPUT>"
+            - name: PYTHONDONTWRITEBYTECODE
+              # Without this, Python tries to write .pyc files alongside
+              # source files on import — which fails silently in some
+              # cases and noisily in others under a read-only root
+              # filesystem (see readOnlyRootFilesystem below).
+              value: "1"
+            - name: HOME
+              # azure-identity / MSAL attempts to write a token cache to
+              # the home directory by default. Pointing HOME at the
+              # writable /tmp emptyDir mounted below avoids a crash on
+              # first token acquisition under a read-only root filesystem.
+              value: "/tmp"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        # Writable scratch space — required because readOnlyRootFilesystem
+        # above makes the rest of the container filesystem immutable.
+        # Without this, the container crashes on first attempt to write a
+        # token cache or temp file. This is the kind of failure that's
+        # easy to miss until you actually deploy — flagged explicitly here
+        # rather than discovered the hard way.
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-api
+  namespace: contoso-rag
+spec:
+  selector:
+    app: rag-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP

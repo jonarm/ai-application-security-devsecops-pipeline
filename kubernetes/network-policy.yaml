@@ -1,0 +1,85 @@
+# network-policy.yaml — Default-deny with explicit allow rules for the
+# contoso-rag namespace.
+#
+# Pattern: deny everything first, then open only what the RAG API actually
+# needs. This addresses the "Elevation of Privilege via lateral movement"
+# row in docs/threat-model-rag-service.md's STRIDE table — a compromised
+# pod in this namespace cannot reach other workloads in the cluster, and
+# cannot be reached by anything other than the ingress path explicitly
+# allowed below.
+#
+# Egress to Azure PaaS services (OpenAI, AI Search, Key Vault) is allowed
+# on 443 to any destination rather than to specific IP ranges, because
+# Azure-managed service endpoints don't expose stable IPs suitable for an
+# ipBlock allow-list. This is a known precision tradeoff — see
+# kubernetes/README.md for the alternative (Azure Firewall / NAT with FQDN
+# filtering) that would tighten this further and is noted as a follow-up,
+# not implemented in this build.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: contoso-rag
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rag-api-allow-ingress
+  namespace: contoso-rag
+spec:
+  podSelector:
+    matchLabels:
+      app: rag-api
+  policyTypes:
+    - Ingress
+  ingress:
+    # Only traffic from the ingress controller namespace reaches the pod.
+    # Direct pod-to-pod traffic from elsewhere in the cluster is denied by
+    # default-deny-all above and not re-opened here.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rag-api-allow-egress
+  namespace: contoso-rag
+spec:
+  podSelector:
+    matchLabels:
+      app: rag-api
+  policyTypes:
+    - Egress
+  egress:
+    # DNS resolution — required for the pod to resolve Azure service
+    # hostnames at all; without this rule, default-deny-all blocks DNS too.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # HTTPS egress to Azure OpenAI, Azure AI Search, Azure Key Vault, and
+    # the Microsoft Entra token endpoint used by Workload Identity. See the
+    # comment block at the top of this file for why this is host-based
+    # rather than IP-range-based.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
