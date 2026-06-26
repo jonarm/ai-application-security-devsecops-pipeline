@@ -1,0 +1,118 @@
+// prompt-injection-detection.kql
+//
+// Purpose
+// -------
+// Detects sustained or high-severity prompt injection attempts against the
+// RAG API, using the structured guardrail decision logs emitted by
+// app/rag-api/main.py's _log_guardrail_event() function.
+//
+// Data source and schema
+// -----------------------
+// Source table: ContainerLogV2 (the current Azure Monitor Container
+// Insights schema for AKS — verified against Microsoft Learn at the time
+// of writing, NOT assumed from memory; see sentinel/README.md for why
+// that distinction matters here).
+//
+// app/rag-api/main.py logs one JSON line per guardrail decision via
+// Python's logging module to stdout, e.g.:
+//   {"stage": "input", "customer_id": "cust-123", "control": "prompt_filter",
+//    "allowed": false, "reason": "instruction_override", "matched_pattern": "..."}
+//
+// ContainerLogV2's LogMessage column is `dynamic` and auto-parses valid
+// JSON log lines — but if a line is ever malformed JSON, it lands as an
+// escaped plain string instead. The tostring() -> parse_json() round trip
+// below handles both cases defensively rather than assuming clean parsing,
+// which is exactly the kind of schema assumption that bit the Sentinel
+// rule in the companion governance repo on first real run.
+//
+// Detection logic
+// ----------------
+// Two trigger conditions, combined into one rule with a computed severity
+// per row, rather than two separate rules:
+//   1. SUSTAINED: 3 or more blocked input-guardrail events from the same
+//      customer_id within a 15-minute window — modelled on the
+//      "Exfiltration via repeated probing" path in the attack tree in
+//      docs/threat-model-rag-service.md.
+//   2. HIGH-CONFIDENCE SINGLE EVENT: any single block where reason is
+//      system_prompt_probe or role_manipulation — these two categories
+//      indicate deliberate adversarial intent on their own, unlike
+//      excessive_length, which can be incidental.
+//
+// Known limitation (documented, not hidden, per this repo's standard):
+// a single well-crafted instruction_override or suspicious_encoding block
+// does NOT alone trigger this rule. Catching that requires either a lower
+// sustained-count threshold (at the cost of more noise) or a separate
+// rule scoped to specific high-risk customers/sessions. Recorded here as
+// a tuning decision, not an oversight.
+
+let lookback = 15m;
+let sustainedThreshold = 3;
+let highConfidenceReasons = dynamic(["system_prompt_probe", "role_manipulation"]);
+
+ContainerLogV2
+| where PodNamespace == "contoso-rag"
+| where ContainerName == "rag-api"
+// Uncomment and set this if multiple AKS clusters feed the same
+// Log Analytics workspace — without it, this query matches the
+// namespace/container name across ALL such clusters.
+// | where _ResourceId =~ "<AKS_CLUSTER_RESOURCE_ID>"
+| extend ParsedLog = iff(
+    isnotnull(LogMessage),
+    parse_json(tostring(LogMessage)),
+    parse_json("{}")
+  )
+| extend
+    Stage = tostring(ParsedLog.stage),
+    Control = tostring(ParsedLog.control),
+    Allowed = tobool(ParsedLog.allowed),
+    Reason = tostring(ParsedLog.reason),
+    MatchedPattern = tostring(ParsedLog.matched_pattern),
+    CustomerId = tostring(ParsedLog.customer_id)
+| where Stage == "input" and Control == "prompt_filter" and Allowed == false
+| where isnotempty(CustomerId)
+// --- Branch 1: sustained blocked attempts from the same customer ---
+| summarize
+    BlockedCount = count(),
+    Reasons = make_set(Reason),
+    MatchedPatterns = make_set(MatchedPattern),
+    FirstSeen = min(TimeGenerated),
+    LastSeen = max(TimeGenerated)
+  by CustomerId, bin(TimeGenerated, lookback)
+| extend
+    TriggerType = "sustained_blocked_attempts",
+    Severity = iff(BlockedCount >= sustainedThreshold, "Medium", "Informational")
+| where Severity != "Informational"
+| project TimeGenerated = LastSeen, CustomerId, TriggerType, Severity,
+    BlockedCount, Reasons, MatchedPatterns, FirstSeen, LastSeen
+| union (
+    // --- Branch 2: any single high-confidence event, regardless of count ---
+    ContainerLogV2
+    | where PodNamespace == "contoso-rag"
+    | where ContainerName == "rag-api"
+    | extend ParsedLog = iff(
+        isnotnull(LogMessage),
+        parse_json(tostring(LogMessage)),
+        parse_json("{}")
+      )
+    | extend
+        Stage = tostring(ParsedLog.stage),
+        Control = tostring(ParsedLog.control),
+        Allowed = tobool(ParsedLog.allowed),
+        Reason = tostring(ParsedLog.reason),
+        MatchedPattern = tostring(ParsedLog.matched_pattern),
+        CustomerId = tostring(ParsedLog.customer_id)
+    | where Stage == "input" and Control == "prompt_filter" and Allowed == false
+    | where Reason in (highConfidenceReasons)
+    | where isnotempty(CustomerId)
+    | extend
+        TriggerType = "high_confidence_single_event",
+        Severity = "High",
+        BlockedCount = 1,
+        Reasons = pack_array(Reason),
+        MatchedPatterns = pack_array(MatchedPattern),
+        FirstSeen = TimeGenerated,
+        LastSeen = TimeGenerated
+    | project TimeGenerated, CustomerId, TriggerType, Severity,
+        BlockedCount, Reasons, MatchedPatterns, FirstSeen, LastSeen
+  )
+| sort by TimeGenerated desc
