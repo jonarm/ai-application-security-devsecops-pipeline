@@ -26,7 +26,7 @@ metadata:
     # created — see terraform/README.md for the exact apply step. Left as
     # a placeholder here since this value doesn't exist until that
     # resource is provisioned.
-    azure.workload.identity/client-id: "<MANAGED_IDENTITY_CLIENT_ID>"
+    azure.workload.identity/client-id: "e52c8fa7-e4cc-4395-ac33-bdbdd2251c41"
   labels:
     azure.workload.identity/use: "true"
 ---
