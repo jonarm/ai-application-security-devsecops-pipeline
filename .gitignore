@@ -270,3 +270,16 @@ coverage.xml
 #os files
 .DS_Store
 Thumbs.db
+
+# Docker
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ZAP scan output (generated locally/in CI, not a source artifact)
+report_html.html
+*.sarif
