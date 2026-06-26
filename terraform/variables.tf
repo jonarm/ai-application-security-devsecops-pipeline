@@ -29,9 +29,9 @@ variable "aks_node_count" {
 }
 
 variable "aks_node_vm_size" {
-  description = "VM size for AKS nodes."
+  description = "VM size for AKS nodes. Standard_B2s was the original choice but is not allowed in this subscription in eastus — Azure restricts available SKUs per subscription/region based on real-time capacity, and eastus is particularly constrained. Standard_D2s_v7 was confirmed available via the error message's own allow-list when Standard_B2s was rejected."
   type        = string
-  default     = "Standard_B2s"
+  default     = "Standard_D2s_v7"
 }
 
 variable "acr_name" {

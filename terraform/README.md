@@ -73,3 +73,18 @@ actually live" standard this repo series holds itself to:
   NetworkPolicy manifests in `kubernetes/` to actually be enforced. Easy
   to deploy both successfully and assume they're working when they
   silently aren't.
+
+  ## Issues encountered and resolved
+
+- **`Standard_B2s` rejected with a subscription/region SKU restriction.**
+  First `terraform apply` failed creating the AKS cluster with: *"The VM
+  size of Standard_B2s is not allowed in your subscription in location
+  'eastus'"* — followed by a long allow-list containing no B-series VMs at
+  all, only D/E/F-series v7 and larger specialised SKUs. `eastus` is a
+  capacity-constrained Azure region, and this subscription appears to be
+  restricted to a curated SKU list there as a result. Resolved by
+  switching `aks_node_vm_size` to `Standard_D2s_v7` — confirmed available
+  directly from the error's own allow-list rather than guessed. Resource
+  group, Key Vault, ACR, the workload identity, and the Key Vault role
+  assignment all succeeded on the first attempt; only the AKS cluster (and
+  its two dependents) needed the retry.

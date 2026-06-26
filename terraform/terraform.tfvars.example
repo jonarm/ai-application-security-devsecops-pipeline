@@ -4,7 +4,7 @@ environment          = "dev"
 
 aks_cluster_name = "aks-contoso-rag"
 aks_node_count   = 2
-aks_node_vm_size = "Standard_B2s"
+aks_node_vm_size = "Standard_D2s_v7"
 
 # Must be globally unique across all of Azure — change before applying.
 acr_name       = "acrcontosoragXXXX"
