@@ -1,0 +1,50 @@
+name: Build and Push (ACR)
+
+# Separate from trivy.yml — that workflow builds a throwaway local image
+# purely for vulnerability scanning. This workflow builds the real image
+# and pushes it to ACR, authenticating via OIDC with no stored Azure
+# credentials, consistent with this repo's identity-driven pattern
+# everywhere else (Workload Identity for the app, now federated identity
+# for CI too — no static secrets in either direction).
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "app/**"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write   # required to request the OIDC token from GitHub
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC, no stored secrets)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        run: az acr login --name ${{ vars.ACR_NAME }}
+
+      - name: Build and push rag-api image
+        # Build context is app/, NOT app/rag-api/ — a narrower context was
+        # tried first during manual deployment and produced a real
+        # ModuleNotFoundError CrashLoopBackOff on AKS, since
+        # prompt_filter.py and response_filter.py (siblings of rag-api/)
+        # were never included in the image. See app/README.md for the
+        # full writeup of that real deployment failure.
+        run: |
+          docker build -t ${{ vars.ACR_NAME }}.azurecr.io/rag-api:${{ github.sha }} -f app/rag-api/Dockerfile app
+          docker tag ${{ vars.ACR_NAME }}.azurecr.io/rag-api:${{ github.sha }} ${{ vars.ACR_NAME }}.azurecr.io/rag-api:latest
+          docker push ${{ vars.ACR_NAME }}.azurecr.io/rag-api:${{ github.sha }}
+          docker push ${{ vars.ACR_NAME }}.azurecr.io/rag-api:latest
