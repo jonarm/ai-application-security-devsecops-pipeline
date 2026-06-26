@@ -62,3 +62,35 @@ pytest -v
   Search code paths in `clients.py` are written to the actual SDK
   interfaces and the Workload Identity pattern, but have not been run
   against live resources at the time of writing this note.
+
+  ## Prerequisites for building the container
+
+Docker Desktop must be running (not just installed) before `docker build`
+— check for "Engine running" in the Docker Desktop window. On Windows,
+this also requires the WSL2 backend to be enabled.
+
+## Building the image
+
+Two approaches were tried before landing on the one that works for this
+subscription:
+
+1. **`az acr build` (ACR Tasks remote build)** — tried first to avoid a
+   local Docker dependency entirely. Failed with `TasksOperationsNotAllowed`.
+   This is a known Azure restriction: ACR Tasks remote builds are paused
+   for subscriptions funded by free trial credits, which this subscription
+   is. Not fixable without a support ticket or a subscription upgrade —
+   abandoned rather than worth the wait for a portfolio build.
+2. **Local `docker build` + `docker push`** — the approach actually used.
+   Requires Docker Desktop running locally (WSL2 backend) and an
+   `AcrPush` role assignment on the registry, since only the AKS
+   cluster's kubelet identity was granted `AcrPull` in Terraform.
+
+```powershell
+az acr login --name <acr-name>
+docker build -t "<acr-login-server>/rag-api:latest" .
+docker push "<acr-login-server>/rag-api:latest"
+```
+
+This is a real example of free-tier Azure subscription constraints shaping
+a technical decision — documented rather than hidden, consistent with this
+repo series' standard.
