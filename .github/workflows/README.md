@@ -4,15 +4,20 @@
 
 | Stage | Workflow | Trigger | Blocks on |
 |---|---|---|---|
+| Build & Push | `build-and-push.yml` | push to `app/**`, manual (`workflow_dispatch`) | Build or push failure |
 | Static — SAST | `codeql.yml` | push/PR to `app/**`, weekly schedule | CodeQL findings |
 | Static — Secrets | `gitleaks.yml` | push/PR (any path) | Any non-allowlisted secret pattern |
 | Static — Container | `trivy.yml` | push/PR to `app/**` | CRITICAL/HIGH CVEs in the built image |
 | Static — IaC | `checkov.yml` | push/PR to `terraform/**` | Any non-skipped Checkov finding |
 | Dynamic — DAST | `zap-scan.yml` | manual (`workflow_dispatch`) | Any ZAP alert at FAIL threshold (see `.zap/rules.tsv`) |
 
-The four static gates run automatically on every relevant push/PR. The
-dynamic gate is manually triggered for now — see "What's actually live"
-below for why.
+`build-and-push.yml` authenticates to Azure via OIDC using a dedicated
+`id-github-actions-ci` managed identity (see `terraform/github-actions-ci.tf`)
+— deliberately separate from the `id-rag-api-workload` identity the running
+application uses, so CI/CD only ever holds `AcrPush` and the app only ever
+holds `Key Vault Secrets User`. The four static gates run automatically on
+every relevant push/PR. The dynamic gate is manually triggered for now —
+see "What's actually live" below for why.
 
 ## Real findings caught before first run
 
@@ -34,9 +39,10 @@ below for why.
 
 | Component | Status |
 |---|---|
-| YAML syntax for all five workflows | **Validated** — parsed cleanly with an offline parser before commit |
+| YAML syntax for all six workflows | **Validated** — parsed cleanly with an offline parser before commit |
+| `build-and-push.yml` | **Live** — first real run succeeded via manual `workflow_dispatch` trigger, OIDC authentication to Azure with no stored credentials, image built and pushed to ACR with both `:latest` and commit-SHA tags. See `screenshots/aks-deployment/08-github-actions-build-push-success.png` and `09-acr-tags-sha-and-latest.png` |
 | `codeql.yml`, `gitleaks.yml`, `trivy.yml`, `checkov.yml` | **Reference design** — written to trigger automatically on push/PR, not yet exercised against a real GitHub Actions run at the time of writing |
-| `zap-scan.yml` | **Reference design, manually triggered by design** — there is no automated deploy-to-staging workflow in this repo yet, so this cannot run automatically post-deploy. Wiring `zap-scan.yml` to trigger via `workflow_run` after a future deploy workflow is a documented next step, not yet built |
+| `zap-scan.yml` | **Reference design, manually triggered by design** — there is no deploy-to-AKS workflow yet (see Known limitations below), so this cannot run automatically post-deploy. Wiring `zap-scan.yml` to trigger via `workflow_run` after a future deploy workflow is a documented next step, not yet built |
 
 ## Known limitations
 
@@ -44,7 +50,15 @@ below for why.
   Promoting to `zaproxy/action-full-scan` would add active attack payloads
   but risks instability against a low-traffic/shared staging environment —
   noted as a deliberate scope decision for this build.
-- **No automated CD step exists yet** to build the `rag-api` image, push
-  it to the ACR provisioned in `terraform/`, and deploy it to AKS. The
-  four static gates run on source/config; actually getting a running
-  staging endpoint for `zap-scan.yml` to target is still a manual step.
+- **`build-and-push.yml` builds and pushes the image, but does not deploy
+  it to AKS.** Getting a newly-pushed image actually running on the
+  cluster still requires a manual `kubectl rollout restart` — there is no
+  automated CD step from ACR to AKS yet. This is also why `zap-scan.yml`
+  has no automatic trigger: there's no automated step that produces a
+  fresh, reachable staging endpoint to scan.
+
+## CI/CD identity setup — issues encountered and resolved
+
+- **Output values copied from the wrong identity initially.** Before the
+  GitHub Actions CI identity (`id-github-actions-ci`) was actually
+  applied via Terraform, a `terraform output` value was mistakenly
