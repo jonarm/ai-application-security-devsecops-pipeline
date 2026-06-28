@@ -9,6 +9,7 @@ on:
     branches: ["main"]
     paths:
       - "terraform/**"
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -31,14 +32,6 @@ jobs:
           output_format: sarif
           output_file_path: checkov-results.sarif
           soft_fail: false
-          # soft_fail: false means a real finding fails the build. Two
-          # findings this configuration is expected to surface
-          # (CKV_AZURE_110, CKV_AZURE_6) are addressed with inline
-          # #checkov:skip annotations carrying a written justification in
-          # the Terraform files themselves, rather than left to fail the
-          # pipeline silently or swept under soft_fail — see
-          # terraform/key-vault.tf, terraform/aks.tf, and
-          # .github/workflows/README.md for the reasoning behind each.
 
       - name: Upload Checkov results to Security tab
         if: always()
