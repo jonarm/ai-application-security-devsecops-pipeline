@@ -113,3 +113,22 @@ repo series' standard.
   image pull, and pod scheduling all worked correctly on the very first
   attempt — only the application's own module layout inside the image was
   wrong.
+
+  ## Trivy findings — issues encountered and resolved
+
+- **`starlette` 0.38.6 (transitive via `fastapi==0.115.0`) had 3 HIGH CVEs**
+  with available fixes (CVE-2024-47874, CVE-2026-48818, CVE-2026-54283).
+  Fixed by adding an explicit `starlette>=1.3.1` pin to `requirements.txt`
+  and verifying compatibility with the existing `fastapi==0.138.1` pin via
+  a real local build, full pytest run, and manual `/chat` smoke test
+  before pushing — not assumed safe just because pip resolved it.
+- **Several Debian system-package CVEs have no available fix** at the
+  time of writing (`perl-base` — CVE-2026-42496 CRITICAL, CVE-2026-42497
+  HIGH; the `ncurses` family — CVE-2025-69720 HIGH; `libsqlite3-0` —
+  CVE-2026-11822 HIGH). `.github/workflows/trivy.yml` sets
+  `ignore-unfixed: true`, the standard, documented Trivy practice for this
+  exact situation — failing a build indefinitely on a CVE with no
+  upstream patch isn't actionable. This is a category-level gate
+  decision, not a per-CVE one: any future CVE with no fix available will
+  also be silently passed through, which is the intended tradeoff, not a
+  loophole.

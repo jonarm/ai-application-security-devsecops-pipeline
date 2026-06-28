@@ -15,16 +15,10 @@ FROM python:3.12-slim AS base
 WORKDIR /app
 
 COPY rag-api/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Guardrails first — siblings of rag-api/, shared across any future
-# AI-powered service in this repo.
 COPY prompt_filter.py response_filter.py ./
-
-# The service itself, into its own subdirectory. main.py's existing
-# sys.path manipulation (Path(__file__).resolve().parent.parent) already
-# expects exactly this layout — no code changes needed, only the build
-# context and this file.
 COPY rag-api/ ./rag-api/
 
 RUN useradd --create-home --shell /bin/bash appuser
