@@ -11,10 +11,12 @@ resource "azurerm_kubernetes_cluster" "main" {
   resource_group_name = azurerm_resource_group.main.name
   dns_prefix          = "contoso-rag"
   # checkov:skip=CKV_AZURE_6: API server authorized IP ranges intentionally
-  # left open for this lab build — this cluster is accessed from a
-  # residential/dynamic IP during development, and a static allow-list
-  # would need constant updating. Noted as a production-readiness gap,
-  # not an oversight — see terraform/README.md.
+  # left open for this lab build — accessed from a residential/dynamic IP
+  # during development.
+  # checkov:skip=CKV_AZURE_115: A private cluster has no public API server
+  # endpoint, which would break kubectl/az aks get-credentials from a
+  # dynamic IP without adding a VPN or Azure Bastion — same root cause as
+  # the CKV_AZURE_6 decision above.
 
   oidc_issuer_enabled       = true
   workload_identity_enabled = true
