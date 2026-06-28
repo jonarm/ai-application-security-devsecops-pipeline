@@ -79,3 +79,8 @@ variable "github_repository" {
   # Deliberately no default — this must be set explicitly in
   # terraform.tfvars to the real repository path.
 }
+
+variable "log_analytics_workspace_id" {
+  description = "Resource ID of an existing Log Analytics workspace to send AKS Container Insights logs to. Reuses the Sentinel-onboarded workspace from the companion ai-security-llm-governance-controls repo (law-ai-governance-sentinel) rather than provisioning a redundant one — both model the same fictitious Contoso Retail Group tenant."
+  type        = string
+}

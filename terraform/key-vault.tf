@@ -7,26 +7,28 @@ resource "azurerm_key_vault" "main" {
   tenant_id                 = data.azurerm_client_config.current.tenant_id
   sku_name                  = "standard"
   enable_rbac_authorization = true
-  # RBAC authorization (not legacy access policies) is used so Key Vault
-  # access is granted via the azurerm_role_assignment resources below,
-  # consistent with the identity-based access pattern used for ACR.
+  # checkov:skip=CKV_AZURE_109: Firewall rules (network_acls) are not
+  # configured — bundled with the same network-restriction gap as
+  # CKV_AZURE_189 and CKV2_AZURE_32 below.
+  # checkov:skip=CKV_AZURE_189: Disabling public network access requires a
+  # private endpoint + VNet, which (unlike ACR's Premium-gated equivalent)
+  # is achievable on Standard SKU but not yet built. Documented as a real
+  # production-readiness gap, comparable in importance to AKS's
+  # CKV_AZURE_117 disk encryption set decision.
+  # checkov:skip=CKV2_AZURE_32: Same root cause as CKV_AZURE_189 — no
+  # private endpoint/VNet provisioned yet.
   purge_protection_enabled = false
-  # purge_protection disabled deliberately for this lab/portfolio build —
-  # it would otherwise block clean teardown via `terraform destroy`.
-  # Documented here so this isn't mistaken for an oversight in a
-  # production-readiness review.
+  # checkov:skip=CKV_AZURE_110: Purge protection deliberately disabled for
+  # this lab/portfolio build to allow clean teardown via `terraform
+  # destroy` — see terraform/README.md.
+  # checkov:skip=CKV_AZURE_42: Same root cause as CKV_AZURE_110 — this
+  # check also covers soft-delete recoverability, which is implied by the
+  # same purge-protection tradeoff above.
 
   tags = merge(var.tags, { environment = var.environment })
 }
 
 resource "azurerm_role_assignment" "rag_api_kv_secrets_user" {
-  # Grants the workload identity (defined in workload-identity.tf)
-  # read-only access to secrets in this vault. This is the Azure-side half
-  # of the Workload Identity pattern — the Kubernetes-side half is the
-  # ServiceAccount annotation in kubernetes/rbac.yaml.
-  #
-  # No secrets are actually populated in this vault yet — see
-  # terraform/README.md for why, and what would change that.
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.rag_api_workload.principal_id
