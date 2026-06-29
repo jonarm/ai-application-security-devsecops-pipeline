@@ -61,8 +61,8 @@ MAX_INPUT_LENGTH = 2000
 # Instruction-override patterns: attempts to make the model disregard its
 # system prompt or prior instructions.
 _INSTRUCTION_OVERRIDE_PATTERNS = [
-    r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions?",
-    r"disregard\s+(all\s+)?(previous|prior|above)\s+(instructions?|rules?|prompts?)",
+    r"ignore\s+(all\s+)?(?:your\s+|my\s+|the\s+)?(previous|prior|above)\s+instructions?",
+    r"disregard\s+(all\s+)?(?:your\s+|my\s+|the\s+)?(previous|prior|above)\s+(instructions?|rules?|prompts?)",
     r"forget\s+(all\s+)?(previous|prior|your)\s+(instructions?|rules?|training)",
     r"new\s+instructions?\s*:",
     r"override\s+(your\s+)?(instructions?|system\s+prompt|rules?)",
