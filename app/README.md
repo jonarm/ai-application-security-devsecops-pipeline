@@ -132,3 +132,24 @@ repo series' standard.
   decision, not a per-CVE one: any future CVE with no fix available will
   also be silently passed through, which is the intended tradeoff, not a
   loophole.
+  - **`prompt_filter.py`'s instruction-override regex had a real gap**,
+  found independently while re-verifying after the dependency bump: phrases
+  like "ignore/disregard **your** previous instructions" — with a
+  possessive pronoun between the verb and "previous/prior" — bypassed
+  detection entirely. Unrelated to the dependency work, but caught by the
+  same verification pass. Fixed in both the `ignore` and `disregard`
+  patterns; a new test (`test_ignore_your_previous_instructions_is_blocked`)
+  confirms it.
+- **Several Debian system-package CVEs have no available fix** at the time
+  of writing (`perl-base`, the `ncurses` family, `libsqlite3-0`).
+  `.github/workflows/trivy.yml` sets `ignore-unfixed: true` — the standard
+  Trivy practice for CVEs with no upstream patch. This is a category-level
+  gate decision, not per-CVE: any future unfixed CVE is also silently
+  passed through, which is the intended tradeoff.
+- **Local dependency installation hit an unrelated environment mismatch**:
+  the development machine runs Python 3.14, which `pydantic-core`'s pinned
+  version (built via Rust/PyO3) doesn't yet support — PyO3 explicitly caps
+  at Python 3.13. This has no bearing on the actual deployed artifact,
+  since the Docker image uses `python:3.12-slim`; verification was done
+  by running the built container directly rather than fighting the local
+  environment mismatch.
