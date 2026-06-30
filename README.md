@@ -64,7 +64,7 @@ A simplified view — see [`docs/architecture-overview.md`](./docs/architecture-
 | Guardrails Implemented | 2 (input + output), 17 passing tests, 1 documented known bypass | [`app/`](./app/) |
 | CI/CD Security Gates | 6 — build-and-push (OIDC), CodeQL, Gitleaks, Trivy, Checkov, OWASP ZAP | [`.github/workflows/`](./.github/workflows/) |
 | Real CVEs Found and Resolved | 3 HIGH (`starlette`, via a `fastapi` upgrade) | [`app/README.md`](./app/README.md) |
-| Real IaC Findings Triaged | 18 (Checkov) — 5 fixed for real, 13 skipped with written justification | [`terraform/README.md`](./terraform/README.md) |
+| Real IaC Findings Triaged | 36 total Checkov checks — 13 passed, 0 failed, 23 skipped with written justification per check | [`terraform/README.md`](./terraform/README.md) |
 | Kubernetes Security Controls | RBAC, NetworkPolicy (default-deny), restricted Pod Security Standards, Workload Identity | [`kubernetes/`](./kubernetes/) |
 | Sentinel Detection Rules | 1, schema-verified against real `ContainerLogV2` | [`sentinel/`](./sentinel/) |
 | Framework Mapped | Azure CAF (Secure, Govern, Manage, Adopt) | [`docs/framework-mapping.md`](./docs/framework-mapping.md) |
@@ -107,6 +107,7 @@ Full system detail is in [`docs/architecture-overview.md`](./docs/architecture-o
 | AKS Container Insights → Log Analytics | **Live, wiring confirmed** — reuses the companion governance repo's Sentinel-onboarded workspace rather than a redundant one. Data-flow query not yet separately confirmed — see [`sentinel/README.md`](./sentinel/README.md) |
 | OWASP ZAP (DAST) | **Reference design** — workflow written and validated, not yet run against a live reachable endpoint |
 | Real Azure OpenAI / Azure AI Search | **Out of scope by design** — mock mode only; see [`docs/architecture-overview.md`](./docs/architecture-overview.md) |
+| Checkov (IaC Scan) | **Live, clean** — 13 passed, 0 failed, 23 skipped. Every skip carries an inline `#checkov:skip` comment with a specific reason (Premium-SKU-gated ACR feature, architecture tradeoff, or deferred future work) — none are blanket suppressions. See `terraform/README.md`'s "Issues encountered" section for the individual reasoning. |
 
 ---
 
