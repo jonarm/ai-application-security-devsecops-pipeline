@@ -1,24 +1,56 @@
-# AI Application Security & DevSecOps Pipeline
-
 ## Executive Summary
 
-This project demonstrates how to take an AI-enabled application from threat
-model to running, defended code on Azure. It builds and secures a RAG-based
-customer service assistant — the same system a companion governance program
-deliberately scoped as *design only, not running code*. This program closes
-that gap: a real FastAPI service, real input/output guardrails with a full
-test suite, a six-gate CI/CD security pipeline, AKS workload hardening, and
-a detection rule confirmed firing against real application logs from the live
-deployment.
+Built and secured a production-grade AI RAG application on Azure Kubernetes
+Service (AKS) with full DevSecOps lifecycle coverage, including CI/CD security
+gates, Kubernetes hardening, and live detection engineering for AI-specific
+threats such as prompt injection.
 
-Every component in this repo that claims to be "live" is backed by a
-screenshot, a real deployment finding, or a confirmed query result — not just
-a diagram. The few items that are reference design are documented honestly,
-consistently with the evidence standard used across this three-repo series.
+This project demonstrates end-to-end ownership of an AI application from threat
+model → secure build → CI/CD pipeline → cloud deployment → runtime monitoring,
+with real CVE remediation, real deployment issues, and real security detections
+validated in a live environment.
 
-Where the companion AI governance program answers *"what controls should exist
-around this AI system?"*, this program answers *"how do you build and ship the
-thing those controls protect — securely, with evidence at every layer?"*
+Key outcomes:
+
+- Secure AI RAG system built with FastAPI and deployed on AKS
+- 6-gate DevSecOps pipeline (SAST, secrets, container, IaC, DAST, OIDC-authenticated build)
+- Kubernetes security controls (RBAC, NetworkPolicies, Workload Identity)
+- Real vulnerability remediation (3 HIGH CVEs resolved in the dependency chain)
+- Live prompt-injection detection using Microsoft Sentinel (KQL), confirmed against real AKS pod logs
+- Evidence-backed engineering: every control validated via logs, scans, or screenshots
+
+---
+
+## System overview
+
+RAG-based AI assistant secured across four layers:
+
+**Application layer**
+- FastAPI RAG service with mock-mode and real Azure OpenAI path
+- Input guardrail (`prompt_filter.py`) — blocks prompt injection, role manipulation, system-prompt probing
+- Output guardrail (`response_filter.py`) — blocks system-prompt leakage, PII patterns, unsafe markup
+- 17-test automated test suite, including a documented known bypass and one real regex gap caught and fixed during deployment verification
+
+**CI/CD security layer — 6 gates**
+- CodeQL (SAST) — static analysis of Python source
+- Gitleaks (secret scanning) — full git history scan
+- Trivy (container image CVE scanning) — gates on CRITICAL/HIGH, `ignore-unfixed` for unpatched OS packages
+- Checkov (IaC scanning) — 13 passed, 0 failed, 23 skipped with individual written justification per check
+- OIDC-authenticated build and push — no stored Azure credentials in GitHub, Workload Identity Federation
+- OWASP ZAP (DAST) — baseline scan against a live public endpoint: 0 High, 0 Medium, 0 Low
+
+**Platform security layer — AKS**
+- Namespace RBAC (least privilege — ConfigMap read only, no Secrets access)
+- NetworkPolicy (default-deny-all, explicit egress allowlist)
+- Restricted Pod Security Standards (no root, no privilege escalation, read-only root filesystem)
+- Workload Identity Federation — pod acquires Azure AD tokens via OIDC, no static credentials anywhere in the cluster
+- Azure Key Vault integration for secret storage
+
+**Detection and monitoring layer**
+- Microsoft Sentinel KQL rule for sustained and high-confidence prompt injection patterns
+- Live log ingestion from AKS via Azure Monitor Agent (`ama-logs`) and manually provisioned DCR/DCE
+- 413 real `ContainerLogV2` rows confirmed in `law-ai-governance-sentinel`
+- Detection rule confirmed returning `instruction_override` and `system_prompt_probe` events from live pod logs
 
 ---
 
