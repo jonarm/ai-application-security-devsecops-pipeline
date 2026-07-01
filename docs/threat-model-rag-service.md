@@ -147,15 +147,15 @@ gaps are documented honestly rather than implied away:
 
 ## Mitigation status summary
 
-<!-- TBD — fill in as app/ and other folders are built, matching the honesty pattern
-     used in the other two repos' "what's actually live vs reference design" tables -->
-
 | Threat category | Status |
 |---|---|
-| Prompt Injection (LLM01:2025) | TBD |
-| Sensitive Information Disclosure (LLM02:2025) | TBD |
-| Supply Chain (LLM03:2025) | Live — covered by existing CI/CD gates |
-| Improper Output Handling (LLM05:2025) | TBD |
-| System Prompt Leakage (LLM07:2025) | TBD |
-| Vector and Embedding Weaknesses (LLM08:2025) | Reference design — known gap, documented above |
-| Unbounded Consumption (LLM10:2025) | TBD |
+| Prompt Injection (LLM01:2025) | **Live** — `prompt_filter.py`, 11 test cases including a documented known bypass; Sentinel detection rule confirmed returning real `instruction_override` and `system_prompt_probe` rows from live AKS pods |
+| Sensitive Information Disclosure (LLM02:2025) | **Live** — `response_filter.py` with PII pattern matching and output validation; retrieval scoped server-side to the authenticated customer in `clients.py` |
+| Supply Chain (LLM03:2025) | **Live** — Trivy container scanning + Dependabot/dependency scanning in CI; 3 HIGH `starlette` CVEs found and resolved via a `fastapi` version upgrade (see `app/README.md`) |
+| Data and Model Poisoning (LLM04:2025) | **N/A by design** — no fine-tuning pipeline in scope; documented in this threat model as a deliberate out-of-scope decision |
+| Improper Output Handling (LLM05:2025) | **Live** — `response_filter.py` validates structure and content before output leaves the trust boundary; OWASP ZAP DAST confirmed 0 injection-related findings against the live HTTP surface |
+| Excessive Agency (LLM06:2025) | **N/A by design** — this RAG assistant is read-only with no tool-calling or write access; documented as a design decision, not a gap |
+| System Prompt Leakage (LLM07:2025) | **Live** — `response_filter.py` checks for system-prompt fragments in output; confirmed no leakage in live end-to-end tests |
+| Vector and Embedding Weaknesses (LLM08:2025) | **Reference design** — access control on Azure AI Search index write operations is documented as the weakest-documented control in this threat model; flagged as a known gap, not yet hardened |
+| Misinformation (LLM09:2025) | **Out of scope** — a model-quality concern, not a security control; noted here for completeness only |
+| Unbounded Consumption (LLM10:2025) | **Live** — input length limits in `prompt_filter.py` (2000 character cap), rate limiting at AKS ingress |

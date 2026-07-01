@@ -80,12 +80,9 @@ same standard applied throughout this repo series.
 
 ## Status summary
 
-<!-- TBD — update as each component is built, consistent with the "what's actually live
-     vs. reference design" pattern used in the other two repos -->
-
 | CAF methodology | Coverage in this repo | Status |
 |---|---|---|
-| Secure | Guardrails, network/RBAC/pod security, CI/CD static + dynamic gates | TBD |
-| Govern | Terraform-as-policy, threat-model-driven prioritisation | TBD |
-| Manage | Sentinel detection rule, application logging | TBD |
-| Adopt (Innovate) | Cloud-native AI workload build | TBD |
+| Secure | Guardrails, default-deny NetworkPolicy, namespace RBAC, restricted Pod Security Standards, Workload Identity, six CI/CD security gates including DAST | **Live** — all controls deployed and verified; OWASP ZAP confirmed 0 High/Medium/Low against the live endpoint |
+| Govern | All infrastructure defined and deployed via Terraform; threat-model-driven control prioritisation; 23 Checkov findings accepted with individual written justification per check | **Live** — `terraform plan` confirms no drift between declared config and real Azure state |
+| Manage | Microsoft Sentinel detection rule confirmed returning real guardrail decision logs from live AKS pods; structured logging in `main.py` feeds both operational visibility and detection | **Live** — 413 `ContainerLogV2` rows confirmed in `law-ai-governance-sentinel`; query returning real `instruction_override` and `system_prompt_probe` events |
+| Adopt (Innovate) | Cloud-native AI workload built for AKS from the outset — Workload Identity, Key Vault, and Sentinel integration designed into the architecture, not retrofitted | **Live** — working AKS deployment with real end-to-end request flow confirmed |
