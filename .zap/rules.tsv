@@ -1,3 +1,8 @@
 10020	IGNORE	(X-Frame-Options Header Not Set - this is a JSON API with no HTML to frame, clickjacking via this header is not applicable)
 10021	FAIL	(X-Content-Type-Options Header Missing - meaningful for an API returning JSON, should be set)
 10038	FAIL	(Content Security Policy Header Not Set)
+10020	IGNORE	(X-Frame-Options Header Not Set - this is a JSON API with no HTML to frame, clickjacking via this header is not applicable)
+10021	FAIL	(X-Content-Type-Options Header Missing - meaningful for an API returning JSON, should be set)
+10038	FAIL	(Content Security Policy Header Not Set)
+10049	IGNORE	(Storable and Cacheable Content - findings are against 404 responses for non-existent endpoints like /robots.txt and /sitemap.xml, not real API surface; cache-control on 404s from a JSON API is not a meaningful security concern)
+90005	IGNORE	(Sec-Fetch-Dest Header Missing - this is a browser fetch metadata header sent by browsers, not API clients; not meaningful for a REST API and not expected to be present in ZAP scanner requests)
