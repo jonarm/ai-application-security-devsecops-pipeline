@@ -27,7 +27,7 @@ plain string if a log line is malformed. The query's `tostring()` →
 | KQL syntax and schema | **Verified** — written against ContainerLogV2's real, documented schema |
 | Application-side logging (`_log_guardrail_event` in `app/rag-api/main.py`) | **Live** — confirmed producing the exact JSON shape this query expects, both in mock mode locally and against the real AKS deployment |
 | AKS → Log Analytics wiring (`oms_agent` in `terraform/aks.tf`) | **Live, confirmed** — `az aks show` confirms the Container Insights add-on is enabled and pointed at the real `law-ai-governance-sentinel` workspace, reused from the companion `ai-security-llm-governance-controls` repo rather than provisioning a redundant one |
-| This query actually returning real rows when run against that workspace | **Not yet confirmed** — the wiring exists, but a real KQL query has not yet been run against `law-ai-governance-sentinel` to confirm `ContainerLogV2` rows are actually arriving with `PodNamespace == "contoso-rag"`. Container Insights typically takes 5-15 minutes after enablement before data flows; this gap between "agent enabled" and "data confirmed queryable" is the one remaining honest verification step |
+| This query actually returning real rows when run against that workspace | **Live, confirmed** — KQL query run against `law-ai-governance-sentinel` returned 2 real rows: `instruction_override` (matched pattern: "Ignore your previous instructions") and `system_prompt_probe` (matched pattern: "reveal your system prompt"), both from `PodNamespace == "contoso-rag"`, with the exact JSON structure `_log_guardrail_event` in `main.py` was designed to emit. See `screenshots/sentinel-alerts/`. |
 
 ## Known tuning limitation
 
