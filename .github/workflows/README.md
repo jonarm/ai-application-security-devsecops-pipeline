@@ -42,7 +42,7 @@ see "What's actually live" below for why.
 | YAML syntax for all six workflows | **Validated** — parsed cleanly with an offline parser before commit |
 | `build-and-push.yml` | **Live** — first real run succeeded via manual `workflow_dispatch` trigger, OIDC authentication to Azure with no stored credentials, image built and pushed to ACR with both `:latest` and commit-SHA tags. See `screenshots/aks-deployment/08-github-actions-build-push-success.png` and `09-acr-tags-sha-and-latest.png` |
 | `codeql.yml`, `gitleaks.yml`, `trivy.yml`, `checkov.yml` | **Reference design** — written to trigger automatically on push/PR, not yet exercised against a real GitHub Actions run at the time of writing |
-| `zap-scan.yml` | **Reference design, manually triggered by design** — there is no deploy-to-AKS workflow yet (see Known limitations below), so this cannot run automatically post-deploy. Wiring `zap-scan.yml` to trigger via `workflow_run` after a future deploy workflow is a documented next step, not yet built |
+| `zap-scan.yml` | **Live** — run once against a temporary public LoadBalancer endpoint (`http://40.90.240.206`). 68 checks passed, 0 failed, 2 warnings (both justified ignores for a JSON REST API — `10049` on 404 responses for non-existent endpoints, `90005` on a browser-specific fetch metadata header not applicable to API scanning). **Known limitation:** ZAP's spider could not discover `/healthz` or `/chat` because a pure JSON API has no HTML, sitemap, or links for the spider to follow — the scan surface was effectively three 404 endpoints. A more thorough DAST scan would require configuring ZAP with an explicit API definition (OpenAPI/Swagger spec) to target the real endpoints directly. |
 
 ## Known limitations
 
