@@ -123,7 +123,7 @@ Full diagram with trust boundaries and data flows:
 | AI Threat Model | 1 — STRIDE + OWASP LLM Top 10 (2025), applied to this specific service | [`docs/threat-model-rag-service.md`](./docs/threat-model-rag-service.md) |
 | Guardrails | 2 (input + output), 17 tests passing, 1 documented known bypass, 1 real regex gap found and fixed during deployment verification | [`app/`](./app/) |
 | CI/CD Security Gates | 6 — build/push (OIDC), CodeQL, Gitleaks, Trivy, Checkov, OWASP ZAP | [`.github/workflows/`](./.github/workflows/) |
-| Real CVEs Found and Resolved | 3 HIGH in `starlette` — resolved by upgrading `fastapi` from 0.115.0 to 0.138.1 after confirming no patched `starlette` existed within the old version's allowed range | [`app/README.md`](./app/README.md) |
+| Vulnerability Triage | 3 HIGH `starlette` CVEs resolved by upgrading `fastapi` 0.115.0 → 0.138.1 (no patched `starlette` existed within the old version's allowed range); ~180 Debian OS-package CVEs accepted as documented risk via `ignore-unfixed: true` — no upstream fix available at time of build | [`app/README.md`](./app/README.md), [`screenshots/cicd-pipeline/`](./screenshots/cicd-pipeline/) |
 | IaC Security Checks | 13 passed, 0 failed, 23 skipped — every skip carries an inline `#checkov:skip` with a specific written justification | [`terraform/README.md`](./terraform/README.md) |
 | DAST Result | 0 High, 0 Medium, 0 Low against a live public endpoint | [`screenshots/zap-dast-results/`](./screenshots/zap-dast-results/) |
 | Kubernetes Security | RBAC, default-deny NetworkPolicy, restricted Pod Security Standards, Workload Identity (no static credentials) | [`kubernetes/`](./kubernetes/) |
