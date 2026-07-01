@@ -1,6 +1,6 @@
 ## Executive Summary
 
-Built and secured a production-grade AI RAG application on Azure Kubernetes
+Built and secured a AI RAG application on Azure Kubernetes
 Service (AKS) with full DevSecOps lifecycle coverage, including CI/CD security
 gates, Kubernetes hardening, and live detection engineering for AI-specific
 threats such as prompt injection.
