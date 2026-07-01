@@ -65,7 +65,8 @@ resource "azurerm_kubernetes_cluster" "main" {
   # Sentinel-onboarded workspace from the companion governance repo rather
   # than provisioning a redundant one.
   oms_agent {
-    log_analytics_workspace_id = var.log_analytics_workspace_id
+    log_analytics_workspace_id      = var.log_analytics_workspace_id
+    msi_auth_for_monitoring_enabled = true
   }
 
   tags = merge(var.tags, { environment = var.environment })
